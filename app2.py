@@ -23,6 +23,8 @@ uploaded = st.sidebar.file_uploader("Upload CSV", type=["csv"])
 
 # ✅ Local fallback path (use raw string; avoid unicode-escape issues)
 DEFAULT_PATH = "course.csv"
+df = pd.read_csv(DEFAULT_PATH)
+
 
 
 default_top_k = st.sidebar.number_input("Top-K recommendations", min_value=1, max_value=50, value=5, step=1)
@@ -452,6 +454,7 @@ if run:
 
 st.caption("Tip: Tune α — higher = more content-driven; lower = more collaborative. "
            "Enable *unique instructor* to diversify recommendations.")
+
 
 
 
