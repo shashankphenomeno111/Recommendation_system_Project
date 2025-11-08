@@ -1,8 +1,10 @@
-# app.py
+# app2.py
 import streamlit as st
 import numpy as np
 import pandas as pd
 import joblib
+from pathlib import Path
+
 from scipy.sparse import csr_matrix, hstack
 from scipy import sparse
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -18,13 +20,22 @@ st.set_page_config(page_title="Online Course Recommender (Hybrid)", layout="wide
 # =========================
 st.sidebar.title("⚙️ Settings")
 
-# ✅ Use a label here (not a path)
+# Upload option
 uploaded = st.sidebar.file_uploader("Upload CSV", type=["csv"])
 
-# ✅ Local fallback path (use raw string; avoid unicode-escape issues)
-DEFAULT_PATH = r"C:\Users\Shashank\OneDrive\Desktop\online_course_recommendation_v2 (1).csv"
+# ---------- Default data path (REPO-RELATIVE, no Windows paths) ----------
+DATA_CANDIDATES = ["course.csv", "online_course_recommendation_v2 (1).csv"]
 
+def get_default_path():
+    here = Path(__file__).parent
+    for name in DATA_CANDIDATES:
+        p = here / name
+        if p.exists():
+            return p
+    # final fallback (even if it doesn't exist, error will be shown nicely)
+    return here / "course.csv"
 
+DEFAULT_PATH = get_default_path()
 
 default_top_k = st.sidebar.number_input("Top-K recommendations", min_value=1, max_value=50, value=5, step=1)
 alpha = st.sidebar.slider("Hybrid α (content weight)", min_value=0.0, max_value=1.0, value=0.40, step=0.05)
@@ -54,7 +65,7 @@ def _safe_onehot(df, cols):
     ohe_cols = [c for c in cols if c in df.columns]
     if not ohe_cols:
         return csr_matrix((df.shape[0], 0)), [], None
-    # Handle scikit-learn versions that changed 'sparse' -> 'sparse_output'
+    # Handle scikit-learn versions: sparse vs sparse_output
     try:
         ohe = OneHotEncoder(handle_unknown="ignore", sparse=False)
     except TypeError:
@@ -78,7 +89,7 @@ def bm25_weight(X, K1=1.2, B=0.75):
     return csr_matrix((data, (rows, cols)), shape=X.shape)
 
 # =========================
-# Cached builders (recompute only when data changes)
+# Cached loaders/builders
 # =========================
 @st.cache_data(show_spinner=True)
 def load_data_from_upload(file):
@@ -95,7 +106,7 @@ def build_models(df,
                  n_factors=150,
                  bm25_k1=1.2,
                  bm25_b=0.75):
-    # ---------- Ensure columns exist & build combined text ----------
+    # Ensure columns & combined text
     for c in ["course_name", "course_description", "tags", "category", "instructor", "difficulty_level"]:
         if c not in df.columns:
             df[c] = ""
@@ -110,49 +121,45 @@ def build_models(df,
         df["course_description"]
     ).str.lower()
 
-    # ---------- TF-IDF ----------
+    # TF-IDF
     tfidf = TfidfVectorizer(stop_words="english",
                             max_features=tfidf_max_features,
                             ngram_range=tfidf_ngram,
                             min_df=2)
     content_feat = tfidf.fit_transform(df["combined_text"])
 
-    # ---------- Numeric ----------
+    # Numeric
     num_sparse, num_cols, scaler = _safe_numeric(
         df, ["course_price", "course_duration_hours", "rating", "enrollment_numbers", "time_spent_hours"]
     )
 
-    # ---------- One-hot (incl. instructor) ----------
+    # One-hot
     cat_sparse, cat_cols, ohe = _safe_onehot(
         df, ["difficulty_level", "certification_offered", "study_material_available", "instructor"]
     )
 
-    # ---------- Content matrix + NN ----------
+    # Content matrix + NN
     X_content = hstack([content_feat, cat_sparse, num_sparse], format="csr")
     content_nn = NearestNeighbors(n_neighbors=200, metric="cosine", algorithm="brute", n_jobs=-1)
     content_nn.fit(X_content)
 
-    # ---------- Interaction strength ----------
+    # Interaction strength
     if "rating" in df.columns and "time_spent_hours" in df.columns:
         df["interaction_strength"] = df["rating"].fillna(0.0) * np.log1p(df["time_spent_hours"].fillna(0.0))
-        # if zero, fallback to rating
         df.loc[df["interaction_strength"] == 0, "interaction_strength"] = df["rating"].fillna(0.0)
     elif "rating" in df.columns:
         df["interaction_strength"] = df["rating"].fillna(0.0)
     elif "time_spent_hours" in df.columns:
         df["interaction_strength"] = df["time_spent_hours"].fillna(0.0)
     else:
-        # fallback (no interactions available)
         df["interaction_strength"] = 1.0
 
-    # ---------- Build item-user matrix ----------
+    # Item-user matrix
     required = ["user_id", "course_id", "interaction_strength"]
     for c in required:
         if c not in df.columns:
-            if c == "user_id":
-                df["user_id"] = np.arange(len(df))
-            if c == "course_id":
-                df["course_id"] = np.arange(len(df))
+            if c == "user_id": df["user_id"] = np.arange(len(df))
+            if c == "course_id": df["course_id"] = np.arange(len(df))
     interactions = df[["user_id", "course_id", "interaction_strength"]].copy()
     interactions["user_id"] = interactions["user_id"].astype("category")
     interactions["course_id"] = interactions["course_id"].astype("category")
@@ -168,7 +175,7 @@ def build_models(df,
     vals = interactions["interaction_strength"].values.astype(np.float32)
     item_user_mat = csr_matrix((vals, (rows, cols)), shape=(len(item_ids), len(user_ids)))
 
-    # ---------- BM25 + SVD item factors + NN ----------
+    # BM25 + SVD + NN
     item_user_bm25 = bm25_weight(item_user_mat, K1=bm25_k1, B=bm25_b)
     svd = TruncatedSVD(n_components=n_factors, random_state=42)
     item_factors = svd.fit_transform(item_user_bm25)
@@ -176,13 +183,11 @@ def build_models(df,
     item_nn = NearestNeighbors(n_neighbors=200, metric="cosine", algorithm="brute", n_jobs=-1)
     item_nn.fit(item_factors_norm)
 
-    # ---------- Mappings ----------
     cid2dfidx = pd.Series(df.index.values, index=df["course_id"]).to_dict()
     cid2row = {int(cid): int(i) for i, cid in enumerate(item_ids)}
     row2cid = {int(i): int(cid) for i, cid in enumerate(item_ids)}
 
-    # Pack everything
-    bundle = dict(
+    return dict(
         df=df,
         tfidf=tfidf,
         scaler=scaler,
@@ -199,10 +204,9 @@ def build_models(df,
         cid2row=cid2row,
         row2cid=row2cid,
     )
-    return bundle
 
 # =========================
-# Recommend functions (aligned with your notebook)
+# Recommend functions
 # =========================
 def recommend_content(bundle, course_id, top_n=5, buffer=60, ensure_unique_instructor=False):
     df = bundle["df"]; content_nn = bundle["content_nn"]; X_content = bundle["X_content"]
@@ -258,7 +262,6 @@ def recommend_item_mf(bundle, course_id, top_n=5, buffer=250, beta=0.75):
     q_idx = cid2dfidx.get(course_id)
     if q_idx is None:
         return pd.DataFrame([])
-    # content sim to rerank
     if candidates:
         cand_dfidx = [t[2] for t in candidates]
         c_sims = cosine_similarity(X_content[q_idx], X_content[cand_dfidx]).flatten().tolist()
@@ -290,7 +293,6 @@ def recommend_item_mf(bundle, course_id, top_n=5, buffer=250, beta=0.75):
 
 def recommend_hybrid_fixed(bundle, course_id, user_id=None, top_n=5, alpha=0.4,
                            content_pool=800, collab_pool=800, ensure_unique_instructor=False):
-    # Gather candidate IDs from top content & collab lists
     cb = recommend_content(bundle, course_id, top_n=content_pool)
     cf = recommend_item_mf(bundle, course_id, top_n=collab_pool)
     df = bundle["df"]; cid2dfidx = bundle["cid2dfidx"]; X_content = bundle["X_content"]
@@ -305,7 +307,6 @@ def recommend_hybrid_fixed(bundle, course_id, user_id=None, top_n=5, alpha=0.4,
     if not cand_ids:
         return pd.DataFrame([])
 
-    # Content similarities (to query course)
     q_df_idx = cid2dfidx.get(course_id)
     if q_df_idx is None:
         return pd.DataFrame([])
@@ -314,7 +315,6 @@ def recommend_hybrid_fixed(bundle, course_id, user_id=None, top_n=5, alpha=0.4,
     c_sims = cosine_similarity(X_content[q_df_idx], X_content[cand_dfidx]).flatten()
     content_map = {cid: float(c_sims[i]) for i, cid in enumerate(cand_list)}
 
-    # Collab similarities (from cf where available; fill missing via factor cosine)
     collab_map = {}
     if not cf.empty:
         for _, r in cf.iterrows():
@@ -364,7 +364,6 @@ def recommend_hybrid_fixed(bundle, course_id, user_id=None, top_n=5, alpha=0.4,
             "hybrid_score": round(float(hybrid_score), 4)
         })
 
-    # Sort + unique instructors if requested
     out = pd.DataFrame(rows).sort_values("hybrid_score", ascending=False)
     if ensure_unique_instructor and "instructor" in out.columns:
         seen = set(); keep_idx = []
@@ -381,7 +380,7 @@ def recommend_hybrid_fixed(bundle, course_id, user_id=None, top_n=5, alpha=0.4,
         return out.head(top_n).reset_index(drop=True)
 
 # =========================
-# App Flow  ✅ Upload → else fallback (no NoneType errors)
+# App Flow
 # =========================
 try:
     if uploaded is not None:
@@ -389,9 +388,9 @@ try:
             df = load_data_from_upload(uploaded)
         st.sidebar.success("✅ Using uploaded file")
     else:
-        with st.spinner("No upload detected — loading default CSV..."):
+        with st.spinner(f"No upload detected — loading default CSV ({DEFAULT_PATH.name})..."):
             df = load_data_from_path(DEFAULT_PATH)
-        st.sidebar.info(f"ℹ️ Using default CSV:\n{DEFAULT_PATH}")
+        st.sidebar.info(f"ℹ️ Using default CSV: {DEFAULT_PATH.name}")
 except Exception as e:
     st.error(f"❌ Could not load a dataset.\n\n{e}")
     st.stop()
@@ -407,7 +406,6 @@ with left:
 
     if name_col and id_col:
         names = df[[id_col, name_col]].drop_duplicates()
-        # Some CSVs may have non-int IDs; cast safely
         try:
             names[id_col] = names[id_col].astype(int)
         except Exception:
@@ -439,7 +437,6 @@ if run:
         st.subheader("⭐ Hybrid Recommendations")
         st.dataframe(recs.reset_index(drop=True))
 
-    # Optional debug panels (content & MF individually)
     with st.expander("Advanced: inspect Content-only and MF-only results"):
         c_recs = recommend_content(bundle, course_id, top_n=default_top_k, ensure_unique_instructor=unique_instructor)
         m_recs = recommend_item_mf(bundle, course_id, top_n=default_top_k)
@@ -453,8 +450,3 @@ if run:
 
 st.caption("Tip: Tune α — higher = more content-driven; lower = more collaborative. "
            "Enable *unique instructor* to diversify recommendations.")
-
-
-
-
-
