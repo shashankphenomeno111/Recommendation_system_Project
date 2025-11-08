@@ -22,7 +22,8 @@ st.sidebar.title("⚙️ Settings")
 uploaded = st.sidebar.file_uploader("Upload CSV", type=["csv"])
 
 # ✅ Local fallback path (use raw string; avoid unicode-escape issues)
-DEFAULT_PATH = "online_course_recommendation_v2 (1).xlsx"
+DEFAULT_PATH = "course.csv"
+
 
 default_top_k = st.sidebar.number_input("Top-K recommendations", min_value=1, max_value=50, value=5, step=1)
 alpha = st.sidebar.slider("Hybrid α (content weight)", min_value=0.0, max_value=1.0, value=0.40, step=0.05)
@@ -451,5 +452,6 @@ if run:
 
 st.caption("Tip: Tune α — higher = more content-driven; lower = more collaborative. "
            "Enable *unique instructor* to diversify recommendations.")
+
 
 
