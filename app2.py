@@ -22,8 +22,7 @@ st.sidebar.title("⚙️ Settings")
 uploaded = st.sidebar.file_uploader("Upload CSV", type=["csv"])
 
 # ✅ Local fallback path (use raw string; avoid unicode-escape issues)
-DEFAULT_PATH = "course.csv"
-df = pd.read_csv(DEFAULT_PATH)
+DEFAULT_PATH = r"C:\Users\Shashank\OneDrive\Desktop\online_course_recommendation_v2 (1).csv"
 
 
 
@@ -454,6 +453,7 @@ if run:
 
 st.caption("Tip: Tune α — higher = more content-driven; lower = more collaborative. "
            "Enable *unique instructor* to diversify recommendations.")
+
 
 
 
