@@ -209,5 +209,17 @@ The Online Course Recommendation System is successfully deployed using Streamlit
 You can run or host this application easily via Streamlit Cloud.
 
 🔗 Live App
-https://your-streamlit-app-url
+(https://recommendation-system-project.streamlit.app/)
+
+## deplopyment page screenshot
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/b0d6711b-5eeb-4f1a-b5a5-fd05b6867210" />
+
+## 👤 Author
+
+**Shashank R**  
+A passionate Data Science enthusiast focused on building real-world predictive ML models, 
+recommendation systems, and end-to-end product deployments.
+
+📧 Email: shashankphenomenon@gmail.com 
+🔗 LinkedIn: https://www.linkedin.com/in/your-profile  
 
