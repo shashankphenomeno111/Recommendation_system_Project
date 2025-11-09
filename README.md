@@ -1,8 +1,9 @@
-<h1 align="center"><b>ONLINE COURSE RECOMMENDATION SYSTEM</b></h1>
+<h1 align="center" style="font-size:48px; font-weight:900; color:#0A5FFF;">
+  ONLINE COURSE RECOMMENDATION SYSTEM
+</h1>
 
-<p align="center">
-  <img src="images/course_recommendation.png" width="850">
-</p>
+
+
 
 <img width="1024" height="1536" alt="image" src="https://github.com/user-attachments/assets/6c74d714-7711-4b7e-9ed1-6106f408ae04" />
 
