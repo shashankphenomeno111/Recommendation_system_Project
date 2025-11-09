@@ -1,29 +1,13 @@
 #Online Course Recommendation System
 
-📌 Save this image → Use in README
-(You can rename to: banner_course_reco.png)
-
-<p align="center"> <img src="https://raw.githubusercontent.com/<username>/<repo>/main/images/banner_course_reco.png" width="900"/> </p>
-
-👉 NOTE:
-The image has been generated on your side as:
-A_four-panel_digital_graphic_showcases_a_demo_of_a.png (rename later)
-You will need to upload it to GitHub → /images/
-
-✅ ✅ 2) INITIAL README.md (Objective + Dataset)
-
-Copy–paste into a new repo README.md 👇
-(You can add modeling later)
-
-📘 Online Course Recommendation System
-<p align="center"> <img src="/images/banner_course_reco.png" width="900"/> </p>
+<img width="1024" height="1536" alt="image" src="https://github.com/user-attachments/assets/6c74d714-7711-4b7e-9ed1-6106f408ae04" />
 
 An end-to-end recommendation system that suggests relevant online courses to learners based on preferences, history, and engagement.
+
 
 ✅ Business Objective
 
 Online learning platforms face difficulty in helping learners discover the most suitable courses from large catalogs.
-
 This project aims to build a Recommendation System that suggests courses to users based on:
 
 ✅ User behavior
