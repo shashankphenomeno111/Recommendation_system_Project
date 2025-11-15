@@ -221,5 +221,5 @@ A passionate Data Science enthusiast focused on building real-world predictive M
 recommendation systems, and end-to-end product deployments.
 
 📧 Email: shashankphenomenon@gmail.com 
-🔗 LinkedIn: https://www.linkedin.com/in/your-profile  
+🔗 LinkedIn:(https://www.linkedin.com/in/shashankdatascientist/) 
 
